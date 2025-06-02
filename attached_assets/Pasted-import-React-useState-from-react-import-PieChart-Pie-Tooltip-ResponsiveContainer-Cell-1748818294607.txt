@@ -1,0 +1,444 @@
+import React, { useState } from 'react';
+import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Componentes de UI (simulando shadcn/ui) ---
+// Componente Card
+const Card = ({ children, className }) => (
+  <div className={`rounded-xl border bg-card text-card-foreground shadow ${className}`}>
+    {children}
+  </div>
+);
+
+// Componente CardContent
+const CardContent = ({ children, className }) => (
+  <div className={`p-6 pt-0 ${className}`}>
+    {children}
+  </div>
+);
+
+// Componente Button
+const Button = ({ children, className, onClick, variant = "default", disabled }) => {
+  const baseStyle = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+  const variants = {
+    // Estilo padrão do botão (ex: "Começar Agora", "Próximo", "Finalizar", "Recomeçar Questionário")
+    default: "bg-[#002147] text-white hover:bg-blue-900 shadow-lg",
+    // Estilo do botão outline (ex: "Voltar")
+    outline: "border border-[#002147] text-[#002147] bg-white hover:bg-blue-50",
+    // Estilo do botão secundário (para opções não selecionadas nas perguntas)
+    secondary: "bg-gray-600 text-white hover:bg-gray-700", // Ajustado para cinza mais escuro e texto branco
+  };
+  return (
+    <button
+      className={`${baseStyle} ${variants[variant]} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
+// --- Dados das Perguntas ---
+const questions = [
+  { id: 0, weight: 1, section: "Experiência", text: "Qual é sua experiência anterior com investimentos?", options: ["Nenhuma", "Alguma experiência", "Experiente"] },
+  { id: 6, weight: 1, section: "Experiência", text: "Com que frequência você revisa seus investimentos?", options: ["Raramente", "Anualmente", "Mensalmente"] },
+  { id: 7, weight: 1.5, section: "Objetivos", text: "Qual é sua prioridade ao investir?", options: ["Segurança", "Equilíbrio", "Crescimento"] },
+  { id: 8, weight: 1, section: "Objetivos", text: "Você prefere uma carteira automatizada ou personalizada?", options: ["Automatizada", "Indiferente", "Personalizada"] },
+  { id: 1, weight: 2, section: "Tolerância", text: "Qual é o seu nível de conforto ao ver seu portfólio cair 10% em um mês?", options: ["Muito desconfortável", "Um pouco desconfortável", "Confortável"] },
+  { id: 2, weight: 2.5, section: "Tolerância", text: "Se você tivesse R$ 100.000 investidos, quanto estaria disposto a perder em 6 meses para tentar obter retornos maiores?", options: ["Até R$ 5.000", "Até R$ 15.000", "Até R$ 30.000 ou mais"] },
+  { id: 3, weight: 1.5, section: "Tolerância", text: "Qual cenário descreve melhor sua reação a uma crise do mercado?", options: ["Vendo quedas, vendo tudo e saio", "Fico investido e espero", "Vejo como oportunidade e compro mais"] },
+  { id: 4, weight: 2, section: "Tolerância", text: "Em um investimento com chance de ganhar R$ 30.000 ou perder R$ 10.000, o que você faria?", options: ["Evito a perda", "Talvez aceitaria", "Aceito o risco"] },
+  { id: 5, weight: 2, section: "Tolerância", text: "Se seu investimento caísse 20% em um trimestre, o que você faria?", options: ["Venderia tudo", "Aguardaria recuperação", "Investiria mais"] },
+  { id: 9, weight: 1.5, section: "Tolerância", text: "Se você herdasse R$ 1 milhão hoje, como alocaria o valor?", options: ["Deixaria parado no banco", "Investiria aos poucos", "Investiria tudo estrategicamente"] }
+];
+
+// --- Definições de Perfil de Investidor ---
+const profiles = {
+  conservador: {
+    name: 'Portfólio Conservador - Topo Capital',
+    description: 'Ideal para investidores que prezam pela segurança e têm baixa tolerância a perdas.',
+    allocation: {
+      "Renda Fixa - Pós-Fixado": 60.0,
+      "Renda Fixa - IPCA +": 15.0,
+      "Renda Fixa - Pré": 5.0,
+      "Renda Fixa - Ativo": 0.0,
+      "Renda Fixa - Reserva de Emergência | Caixa": 20.0,
+      "Fundos Imobiliários": 0.0,
+      "Renda Variável Brasil": 0.0,
+      "Renda Variável Global": 0.0
+    },
+    metrics: {
+      retorno: "12,6% a.a.",
+      volatilidade: "0,56% a.a.",
+      "Índice de Sharpe": "1,17", // Corrigido
+      "Performance sobre o CDI": "109,74%" // Corrigido
+    }
+  },
+  moderado: {
+    name: 'Portfólio Moderado - Topo Capital',
+    description: 'Equilíbrio entre segurança e retorno, para investidores que aceitam oscilações moderadas.',
+    allocation: {
+      "Renda Fixa - Pós-Fixado": 50.0,
+      "Renda Fixa - IPCA +": 15.0,
+      "Renda Fixa - Pré": 5.0,
+      "Renda Fixa - Ativo": 5.0,
+      "Renda Fixa - Reserva de Emergência | Caixa": 10.0,
+      "Fundos Imobiliários": 5.0,
+      "Renda Variável Brasil": 7.5,
+      "Renda Variável Global": 2.5
+    },
+    metrics: {
+      retorno: "14,8% a.a.",
+      volatilidade: "1,33% a.a.",
+      "Índice de Sharpe": "1,32", // Corrigido
+      "Performance sobre o CDI": "126,98%" // Corrigido
+    }
+  },
+  arrojado: {
+    name: 'Portfólio Arrojado - Topo Capital',
+    description: 'Para investidores com alta tolerância a risco que buscam retornos elevados.',
+    allocation: {
+      "Renda Fixa - Pós-Fixado": 45.0,
+      "Renda Fixa - IPCA +": 20.0,
+      "Renda Fixa - Pré": 2.5,
+      "Renda Fixa - Ativo": 5.0,
+      "Renda Fixa - Reserva de Emergência | Caixa": 5.0,
+      "Fundos Imobiliários": 5.0,
+      "Renda Variável Brasil": 7.5,
+      "Renda Variável Global": 10.0
+    },
+    metrics: {
+      retorno: "15,3% a.a.",
+      volatilidade: "2,16% a.a.",
+      "Índice de Sharpe": "1,78", // Corrigido
+      "Performance sobre o CDI": "131,47%" // Corrigido
+    }
+  }
+};
+
+// Cores para os segmentos do gráfico e itens de texto
+const chartColors = [
+  '#002147', // Azul Escuro (primário Topo Capital)
+  '#004080', // Azul Médio
+  '#2a6f97', // Outro tom de Azul
+  '#6a994e', // Esverdeado
+  '#f28482', // Avermelhado
+  '#f8ad9d', // Vermelho mais claro
+  '#c77dff', // Roxo
+  '#8338ec'  // Roxo mais escuro
+];
+
+// Variantes de animação para transições
+const pageVariants = {
+  initial: { opacity: 0, x: "100vw" },
+  in: { opacity: 1, x: 0 },
+  out: { opacity: 0, x: "-100vw" }
+};
+
+const pageTransition = {
+  type: "tween",
+  ease: "anticipate",
+  duration: 0.5
+};
+
+// --- Componente Principal: PerfilInvestidor ---
+const PerfilInvestidor = () => {
+  const [step, setStep] = useState(-1); // -1: tela de boas-vindas, 0 a N-1: seções de perguntas, N: resultado
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // Índice da pergunta atual dentro da seção
+  const [answers, setAnswers] = useState({});
+  const [riskScore, setRiskScore] = useState(null);
+  const [result, setResult] = useState(null);
+
+  // Agrupa as perguntas por seção
+  const sections = Object.entries(questions.reduce((acc, q) => {
+    acc[q.section] = acc[q.section] || [];
+    acc[q.section].push(q);
+    return acc;
+  }, {}));
+
+  const totalSections = sections.length;
+  const currentSectionQuestions = sections[step] ? sections[step][1] : [];
+  const currentQuestion = currentSectionQuestions[currentQuestionIndex];
+
+  // Lida com a seleção de uma opção para uma pergunta
+  const handleSelect = (qid, index) => {
+    setAnswers({ ...answers, [qid]: index });
+  };
+
+  // Calcula o perfil do investidor com base nas respostas
+  const calculateProfile = () => {
+    let score = 0;
+    let maxPossibleScore = 0; // Pontuação máxima possível se todas as respostas fossem 'Experiente' (índice 2)
+    questions.forEach(q => {
+      const ans = answers[q.id];
+      if (ans !== undefined) {
+        score += ans * q.weight;
+      }
+      maxPossibleScore += 2 * q.weight; // Pontuação máxima para cada pergunta é 2 (índice da última opção) * peso
+    });
+
+    // Normaliza a pontuação para uma porcentagem (0-100)
+    const normalizedScore = (score / maxPossibleScore) * 100;
+    setRiskScore(Math.round(normalizedScore));
+
+    // Determina o perfil com base na pontuação normalizada
+    if (normalizedScore <= 40) setResult('conservador');
+    else if (normalizedScore <= 70) setResult('moderado');
+    else setResult('arrojado');
+
+    setStep(totalSections); // Move para a etapa de resultado
+  };
+
+  // Navega para a próxima pergunta/seção
+  const nextStep = () => {
+    if (currentQuestion && answers[currentQuestion.id] === undefined) {
+      // Não permite avançar se a pergunta atual não foi respondida
+      return;
+    }
+
+    if (currentQuestionIndex < currentSectionQuestions.length - 1) {
+      // Se há mais perguntas na seção atual, avança para a próxima pergunta
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else if (step < totalSections - 1) {
+      // Se é a última pergunta da seção atual e há mais seções, avança para a próxima seção
+      setCurrentQuestionIndex(0); // Reinicia o índice da pergunta para a nova seção
+      setStep(step + 1);
+    } else if (step === totalSections - 1) {
+      // Se é a última pergunta da última seção, calcula o perfil
+      calculateProfile();
+    }
+  };
+
+  // Navega para a pergunta/seção anterior
+  const prevStep = () => {
+    if (currentQuestionIndex > 0) {
+      // Se não é a primeira pergunta da seção, volta para a pergunta anterior
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    } else if (step > 0) {
+      // Se é a primeira pergunta da seção e não é a primeira seção, volta para a última pergunta da seção anterior
+      const prevSectionQuestions = sections[step - 1][1];
+      setCurrentQuestionIndex(prevSectionQuestions.length - 1);
+      setStep(step - 1);
+    } else if (step === 0 && currentQuestionIndex === 0) {
+      // Se é a primeira pergunta da primeira seção, volta para a tela de boas-vindas
+      setStep(-1);
+    }
+  };
+
+  // Reinicia o questionário
+  const resetQuiz = () => {
+    setStep(-1);
+    setAnswers({});
+    setRiskScore(null);
+    setResult(null);
+    setCurrentQuestionIndex(0); // Reinicia o índice da pergunta
+  };
+
+  // Obtém os dados do perfil atual para exibição
+  const profile = result ? profiles[result] : null;
+
+  // Formata os dados de alocação para o Gráfico de Pizza
+  const chartData = Object.entries(profile?.allocation || {}).map(([name, value]) => ({ name, value }));
+
+  // Cálculo do progresso geral
+  const totalQuestions = questions.length;
+  const answeredQuestionsCount = Object.keys(answers).length;
+  const overallProgressPercentage = (answeredQuestionsCount / totalQuestions) * 100;
+
+  // --- Lógica de Renderização ---
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white via-gray-50 to-gray-100 text-gray-900 font-inter flex flex-col items-center justify-start p-4">
+      {/* Cabeçalho com Logo */}
+      <header className="fixed top-0 left-0 w-full bg-white bg-opacity-95 backdrop-blur-sm shadow-md p-4 z-50 flex items-center">
+        <img
+          src="https://placehold.co/150x50/002147/FFFFFF?text=TOPO+CAPITAL" // Placeholder com as cores da Topo Capital
+          alt="Logo Topo Capital"
+          className="h-10 w-auto"
+        />
+      </header>
+
+      <div className="max-w-3xl w-full mx-auto mt-20"> {/* Adicionado mt-20 para empurrar o conteúdo abaixo do cabeçalho fixo */}
+        <AnimatePresence mode="wait">
+          {step === -1 && (
+            <motion.div
+              key="welcome"
+              initial="initial"
+              animate="in"
+              exit="out"
+              variants={pageVariants}
+              transition={pageTransition}
+              className="space-y-8 text-center p-8 bg-white rounded-xl shadow-2xl border border-gray-200"
+            >
+              <h1 className="text-4xl font-extrabold text-[#002147] mb-4 drop-shadow-md">Suitability Topo Capital</h1>
+              <p className="text-gray-700 text-xl leading-relaxed">
+                Responda algumas perguntas para entender qual portfólio de investimentos é mais adequado para você.
+              </p>
+              <Button
+                className="text-lg px-8 py-4 rounded-full shadow-xl hover:scale-105 transition-transform duration-300 ease-in-out"
+                onClick={() => setStep(0)}
+              >
+                Começar Agora
+              </Button>
+            </motion.div>
+          )}
+
+          {step >= 0 && step < totalSections && (
+            <motion.div
+              key={`question-section-${step}-${currentQuestionIndex}`} // Chave única para animação de transição de pergunta
+              initial="initial"
+              animate="in"
+              exit="out"
+              variants={pageVariants}
+              transition={pageTransition}
+              className="space-y-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-200"
+            >
+              <h2 className="text-3xl font-bold text-[#002147] mb-6 text-center">
+                {sections[step][0]} {/* Título da Seção */}
+              </h2>
+              {/* Barra de Progresso */}
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                <div
+                  className="bg-[#002147] h-2.5 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${overallProgressPercentage}%` }}
+                ></div>
+              </div>
+              <p className="text-center text-lg text-gray-600 mb-4">
+                Pergunta {currentQuestionIndex + 1} de {currentSectionQuestions.length} na seção "{sections[step][0]}"
+              </p>
+
+              {currentQuestion && (
+                <Card key={currentQuestion.id} className="mb-6 bg-gray-50 border-gray-200 shadow-md">
+                  <CardContent className="p-5">
+                    <p className="text-lg font-semibold text-gray-800 mb-4">{currentQuestion.text}</p>
+                    <div className="flex flex-col space-y-3">
+                      {currentQuestion.options.map((option, index) => (
+                        <Button
+                          key={index}
+                          // Aplica fundo azul marinho e texto dourado para o botão selecionado
+                          className={`w-full py-3 text-base rounded-lg transition-all duration-200 ease-in-out
+                            ${answers[currentQuestion.id] === index ? "bg-[#002147] text-[#FFD700] shadow-lg" : "bg-gray-600 text-white hover:bg-gray-700"}
+                          `}
+                          onClick={() => handleSelect(currentQuestion.id, index)}
+                        >
+                          {option}
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex justify-between mt-8">
+                <Button
+                  onClick={prevStep}
+                  disabled={step === 0 && currentQuestionIndex === 0}
+                  variant="outline"
+                  className="px-6 py-3 text-lg border-[#002147] text-[#002147] hover:bg-blue-50"
+                >
+                  Voltar
+                </Button>
+                <Button
+                  onClick={nextStep}
+                  disabled={currentQuestion && answers[currentQuestion.id] === undefined}
+                  className="px-6 py-3 text-lg bg-[#002147] text-white hover:bg-blue-900 shadow-lg"
+                >
+                  {step === totalSections - 1 && currentQuestionIndex === currentSectionQuestions.length - 1 ? 'Finalizar' : 'Próximo'}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === totalSections && profile && (
+            <motion.div
+              key="result"
+              initial="initial"
+              animate="in"
+              exit="out"
+              variants={pageVariants}
+              transition={pageTransition}
+              className="space-y-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-200 text-center"
+            >
+              {/* Título do resultado alterado */}
+              <h2 className="text-3xl font-bold text-[#002147] mb-2">
+                Com base em seu suitability, segue abaixo a carteira sugerida:
+              </h2>
+              <h3 className="text-4xl font-extrabold text-[#002147] mb-4 drop-shadow-md">{profile.name}</h3>
+              <p className="text-xl text-gray-700 leading-relaxed">{profile.description}</p>
+
+              <div className="bg-blue-50 p-6 rounded-xl shadow-inner border border-blue-200">
+                <h3 className="text-2xl font-bold text-[#002147] mb-4">Alocação Sugerida</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      fill="#8884d8"
+                      labelLine={false}
+                      isAnimationActive={true}
+                      animationDuration={1500}
+                    >
+                      {
+                        chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                        ))
+                      }
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value.toFixed(1)}%`, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Descrição da alocação abaixo do gráfico */}
+                <div className="mt-6 text-left">
+                  <h4 className="text-xl font-bold text-[#002147] mb-3">Detalhes da Alocação:</h4>
+                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                    {Object.entries(profile.allocation).map(([assetName, value], index) => (
+                      <li key={assetName} style={{ color: chartColors[index % chartColors.length] }}>
+                        <span className="font-semibold">{assetName}:</span> {value.toFixed(1)}%
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                {Object.entries(profile.metrics).map(([key, value]) => (
+                  <Card key={key} className="bg-green-50 border-green-200 shadow-md">
+                    <CardContent className="p-5">
+                      <p className="text-lg font-semibold text-green-700 capitalize mb-2">
+                        {key}:
+                      </p>
+                      <p className="text-2xl font-bold text-green-800">{value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <Button
+                onClick={resetQuiz}
+                className="mt-10 px-8 py-4 text-lg bg-[#002147] text-white hover:bg-blue-900 shadow-xl rounded-full hover:scale-105 transition-transform duration-300 ease-in-out"
+              >
+                Recomeçar Questionário
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// Componente principal da aplicação para renderizar PerfilInvestidor
+const App = () => {
+  return (
+    <React.StrictMode>
+      <PerfilInvestidor />
+    </React.StrictMode>
+  );
+};
+
+export default App;
